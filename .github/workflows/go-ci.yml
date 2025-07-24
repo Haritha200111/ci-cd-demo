@@ -1,13 +1,39 @@
-name: Go CI
+# name: Go CI
+
+# on:
+#   push:
+#     branches: [ master ]
+#   pull_request:
+#     branches: [ master ]
+
+# jobs:
+#   build:
+#     runs-on: ubuntu-latest
+
+#     steps:
+#     - name: Checkout code
+#       uses: actions/checkout@v3
+
+#     - name: Set up Go
+#       uses: actions/setup-go@v4
+#       with:
+#         go-version: 1.21
+
+#     - name: Install dependencies
+#       run: go mod tidy
+
+#     - name: Run tests
+#       run: go test ./...
+
+
+name: CI/CD to EC2
 
 on:
   push:
     branches: [ master ]
-  pull_request:
-    branches: [ master ]
 
 jobs:
-  build:
+  build-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
@@ -19,8 +45,28 @@ jobs:
       with:
         go-version: 1.21
 
-    - name: Install dependencies
-      run: go mod tidy
-
-    - name: Run tests
+    - name: Run Tests
       run: go test ./...
+
+    - name: Build Go App
+      run: go build -o myapp .
+
+    - name: Copy file to EC2
+      uses: appleboy/scp-action@v0.1.4
+      with:
+        host: ${{ secrets.EC2_HOST }}
+        username: ${{ secrets.EC2_USER }}
+        key: ${{ secrets.EC2_KEY }}
+        source: "myapp"
+        target: "/home/ubuntu/myapp"
+
+    - name: Restart app on EC2
+      uses: appleboy/ssh-action@v1.0.3
+      with:
+        host: ${{ secrets.EC2_HOST }}
+        username: ${{ secrets.EC2_USER }}
+        key: ${{ secrets.EC2_KEY }}
+        script: |
+          pkill myapp || true
+          nohup ./myapp > out.log 2>&1 &
+          echo "App restarted ✅"
